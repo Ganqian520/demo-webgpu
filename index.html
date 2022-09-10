@@ -1,12 +1,70 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>webgpu-demo</title>
-  </head>
-  <body style="margin: 0px;width: 100vw;height: 100vh;">
-    <canvas style="width: 50vw;height: 50vh;"></canvas>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>webgpu-demo</title>
+  <style>
+    body {
+      display: flex;
+      margin: 0;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #menu {
+      width: 200px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #iframe {
+      flex: 1;
+      border: none;
+    }
+
+    a {
+      height: 50px;
+      line-height: 50px;
+      margin-left: 10px;
+      cursor: pointer;
+    }
+
+    .active {
+      color: blue;
+    }
+  </style>
+</head>
+
+<body>
+  <div id=menu></div>
+  <iframe id=iframe></iframe>
+  <script>
+    const config = [{
+      en: 'basicTriangle',
+      cn: '基础三角形'
+    }, {
+      en: 'updateTriangle',
+      cn: '更新三角形'
+    },{
+      en: 'rotatingCube',
+      cn: '旋转正方体'
+    }]
+    for (let item of config) {
+      const { en: key, cn } = item
+      let a = document.createElement('a')
+      a.innerText = cn
+      a.onclick = () => {
+        iframe.src = `./src/index/${key}/${key}.html`
+        document.querySelector('.active')?.classList.remove('active')
+        a.classList.add('active')
+        window.location.hash = key
+      }
+      menu.appendChild(a)
+      key == 'rotatingCube' && a.click()
+    }
+  </script>
+</body>
+
 </html>
