@@ -37,13 +37,11 @@ async function initPipeline(device:GPUDevice,format:GPUTextureFormat,size: {widt
       buffers: [{
         arrayStride: (3+2)*4,
         attributes: [
-          //position
           {
             shaderLocation: 0,
             offset: 0,
             format: 'float32x3'
           },
-          //uv
           {
             shaderLocation: 1,
             offset: 3*4,
@@ -61,12 +59,12 @@ async function initPipeline(device:GPUDevice,format:GPUTextureFormat,size: {widt
     },
     primitive: {
       topology: 'triangle-list',
-      cullMode: 'back',
+      cullMode: 'back', //背面剔除
       frontFace: 'ccw'
     },
     depthStencil: {
       depthWriteEnabled: true,
-      depthCompare: 'less',
+      depthCompare: 'less', //深度剔除
       format: 'depth24plus',
     }
   })
@@ -163,6 +161,6 @@ const fragmentShder = /* wgsl */`
       @location(0) fragUV: vec2<f32>,
       @location(1) fragPosition: vec4<f32>
   ) -> @location(0) vec4<f32> {
-      return fragPosition;
+    return fragPosition;
   }
 `

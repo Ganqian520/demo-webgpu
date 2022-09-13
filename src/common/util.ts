@@ -19,5 +19,5 @@ export async function initWebGPU() {
     device, format,
     alphaMode: 'opaque'
   })
-  return { device, context, format, size }
+  return { device, context, format, size, canvas }
 }

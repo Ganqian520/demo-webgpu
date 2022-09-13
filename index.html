@@ -6,6 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>webgpu-demo</title>
   <style>
+    * {
+      font-size: 14px;
+    }
     body {
       display: flex;
       margin: 0;
@@ -14,9 +17,30 @@
     }
 
     #menu {
+      background-color: white;
       width: 200px;
       display: flex;
       flex-direction: column;
+      position: absolute;
+      left: 0;
+      top: 0;
+      transition: all 0.3s linear;
+    }
+    .menu-hidden {
+      transform: translateX(-200px);
+    }
+
+    .toggle {
+      position: absolute;
+      top: 0;
+      right: -20px;
+      width: 20px;
+      height: 20px;
+      background-color: rgba(255,255,255,.3);
+      line-height: 20px;
+      text-align: center;
+      color: white;
+      cursor: pointer;
     }
 
     #iframe {
@@ -38,18 +62,26 @@
 </head>
 
 <body>
-  <div id=menu></div>
+  <div id=menu>
+    <div id=toggle class="toggle">></div>
+  </div>
   <iframe id=iframe></iframe>
   <script>
     const config = [{
       en: 'basicTriangle',
-      cn: '基础三角形'
+      cn: '基础三角形',
     }, {
       en: 'updateTriangle',
-      cn: '更新三角形'
+      cn: '更新三角形',
     },{
       en: 'rotatingCube',
-      cn: '旋转正方体'
+      cn: '旋转正方体',
+    },{
+      en: 'computeBoids',
+      cn: '计算管线',
+    },{
+      en: 'firework',
+      cn: '烟花'
     }]
     for (let item of config) {
       const { en: key, cn } = item
@@ -62,7 +94,17 @@
         window.location.hash = key
       }
       menu.appendChild(a)
-      key == 'rotatingCube' && a.click()
+      key == 'firework' && a.click()
+    }
+    
+    let isShowMenu = true
+    toggle.onclick = ()=> {
+      if(isShowMenu){
+        menu.className = 'menu-hidden'
+      }else{
+        menu.className = ''
+      }
+      isShowMenu = !isShowMenu
     }
   </script>
 </body>
