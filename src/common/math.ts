@@ -1,7 +1,11 @@
 import { mat4, vec3 } from 'gl-matrix'
 
+export function random(min:number,max:number) {
+  return Math.floor(Math.random()*(max-min) + min)
+}
+
 // return mvp matrix from given aspect, position, rotation, scale
-function getMvpMatrix(
+export function getMvpMatrix(
   aspect: number,
   position: { x: number, y: number, z: number },
   rotation: { x: number, y: number, z: number },
@@ -20,7 +24,7 @@ function getMvpMatrix(
 }
 
 // return modelView matrix from given position, rotation, scale
-function getModelViewMatrix(
+export function getModelViewMatrix(
   position = { x: 0, y: 0, z: 0 },
   rotation = { x: 0, y: 0, z: 0 },
   scale = { x: 1, y: 1, z: 1 }
@@ -40,7 +44,7 @@ function getModelViewMatrix(
   return modelViewMatrix as Float32Array
 }
 
-function getProjectionMatrix(
+export function getProjectionMatrix(
   aspect: number,
   fov: number = 60 / 180 * Math.PI,
   near: number = 0.1,
@@ -61,5 +65,3 @@ function getProjectionMatrix(
   // return matrix as Float32Array
   return projectionMatrix as Float32Array
 }
-
-export { getMvpMatrix, getModelViewMatrix, getProjectionMatrix }

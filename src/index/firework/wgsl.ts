@@ -1,3 +1,4 @@
+
 export const vertWGSL = /* wgsl */`
   @group(0) @binding(0) var<uniform> mvpMatrix : mat4x4<f32>;
   @vertex
@@ -21,13 +22,25 @@ export const computeWGSL = /* wgsl */`
     gravity: f32,
     birthTime: f32, //ms
   }
+
+  // struct Points {
+  //   points: array<Point>,
+  // }
+
+  struct Params {
+    currentTime: f32,
+  }
+
   const size = u32(1);
-  @group(0) @binding(0) var<storage, read_write> color : vec4<f32>;
+
+  @group(0) @binding(0) var<storage, read> params: Params;
+  @group(0) @binding(1) var<storage, read_write> points: array<Point>;
   @compute @workgroup_size(size)
   fn main(
     @builtin(global_invocation_id) globalInvocationID : vec3<u32>
   ) {
-    var x = color.x;
-    color.x = x;
+    var index = globalInvocationID.x;
+    var a = params.currentTime;
+    var b = points[index];
   }
 `
