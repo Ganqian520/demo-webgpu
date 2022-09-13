@@ -62,7 +62,7 @@
 </head>
 
 <body>
-  <div id=menu>
+  <div id=menu class="menu-hidden">
     <div id=toggle class="toggle">></div>
   </div>
   <iframe id=iframe></iframe>
@@ -97,7 +97,7 @@
       key == 'firework' && a.click()
     }
     
-    let isShowMenu = true
+    let isShowMenu = false
     toggle.onclick = ()=> {
       if(isShowMenu){
         menu.className = 'menu-hidden'

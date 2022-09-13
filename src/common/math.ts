@@ -14,12 +14,11 @@ export function getMvpMatrix(
   // get modelView Matrix
   const modelViewMatrix = getModelViewMatrix(position, rotation, scale)
   // get projection Matrix
-  const projectionMatrix = getProjectionMatrix(aspect)
+  const projectionMatrix = getProjectionMatrix({aspect: aspect})
   // get mvp matrix
   const mvpMatrix = mat4.create()
   mat4.multiply(mvpMatrix, projectionMatrix, modelViewMatrix)
 
-  // return matrix as Float32Array
   return mvpMatrix as Float32Array
 }
 
@@ -44,13 +43,19 @@ export function getModelViewMatrix(
   return modelViewMatrix as Float32Array
 }
 
-export function getProjectionMatrix(
-  aspect: number,
-  fov: number = 60 / 180 * Math.PI,
-  near: number = 0.1,
-  far: number = 100.0,
-  position = { x: 0, y: 0, z: 0 }
-) {
+export function getProjectionMatrix(obj: {
+  aspect?: number,
+  fov?: number,
+  near: number,
+  far: number,
+  position: any
+}) {
+  let {aspect,fov,near,far,position} = obj
+  aspect ??= 1.5
+  fov ??= 60 / 180 * Math.PI
+  near ??= 0.1
+  far ??= 100
+  position ??= { x: 0, y: 0, z: 10 }
   const center = vec3.fromValues(0, 0, 0)
   const up = vec3.fromValues(0, 1, 0)
   // create cameraview

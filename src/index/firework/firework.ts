@@ -2,12 +2,74 @@ import * as dat from 'dat.gui'
 
 import { initWebGPU } from "@/common/util";
 import { cubeData, cubeVertexCount } from "./mesh";
-import { getMvpMatrix,random } from "@/common/math";
+import { random, getProjectionMatrix, getModelViewMatrix } from "@/common/math";
 import { vertWGSL, fragWGSL, computeWGSL } from './wgsl';
 
 const { device, context, format, size, canvas } = await initWebGPU()
 
-const num = 10
+const num = 100
+let aspect = size.width / size.height
+let position = { x: 0, y: 0, z: 0 }
+let rotation = { x: 0, y: 0, z: 0 }
+let scale = { x: 1, y: 1, z: 1 }
+
+const vertexBuffer = device.createBuffer({
+  size: cubeData.byteLength,
+  usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+})
+const projectionBuffer = device.createBuffer({
+  size: 4 * 4 * Float32Array.BYTES_PER_ELEMENT,
+  usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+})
+const modelsBuffer = device.createBuffer({
+  size: 4 * 4 * num * Float32Array.BYTES_PER_ELEMENT,
+  usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+})
+const mvpsBuffer = device.createBuffer({
+  size: 4 * 4 * num * Float32Array.BYTES_PER_ELEMENT,
+  usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+})
+const paramsBuffer = device.createBuffer({
+  size: 1 * Float32Array.BYTES_PER_ELEMENT,
+  usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+})
+const colorBuffer = device.createBuffer({
+  size: 4 * 4,
+  usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+})
+const particlesBuffer = device.createBuffer({
+  size: 9 * num * Float32Array.BYTES_PER_ELEMENT,
+  usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+})
+
+const particlesData = new Float32Array(num * 9)
+const modelsData = new Float32Array(num * 4 * 4)
+for (let i = 0; i < num; i++) {
+  const obj = {
+    position: Object.values(position),
+    velocity: [random(-100, 100), random(-100, 100), random(-100, 100), 0.001],
+    gravity: 10,
+    birthTime: Date.now()
+  }
+  particlesData.set(
+    Object.values(obj).reduce((acc: any, cur: any) => {
+      if (cur instanceof Array) {
+        return [...acc, ...cur]
+      } else {
+        return [...acc, cur]
+      }
+    }, []) as number[],
+    i * 9
+  )
+  modelsData.set(getModelViewMatrix(position), i * 16)
+}
+const projectionMatrix = getProjectionMatrix(size.width / size.height)
+
+device.queue.writeBuffer(modelsBuffer, 0, modelsData)
+device.queue.writeBuffer(vertexBuffer, 0, cubeData)
+device.queue.writeBuffer(projectionBuffer, 0, projectionMatrix)
+device.queue.writeBuffer(colorBuffer, 0, new Float32Array([1, 0, 0, 1]))
+device.queue.writeBuffer(particlesBuffer, 0, particlesData)
 
 const renderPipeline = device.createRenderPipeline({
   layout: 'auto',
@@ -48,59 +110,12 @@ const computePipeline = await device.createComputePipelineAsync({
   }
 })
 
-const vertexBuffer = device.createBuffer({
-  size: cubeData.byteLength,
-  usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
-})
-device.queue.writeBuffer(vertexBuffer, 0, cubeData)
-
-const mvpBuffer = device.createBuffer({
-  size: 4 * 4 * 4,
-  usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-})
-
-const paramsBuffer = device.createBuffer({
-  size: 1 * Float32Array.BYTES_PER_ELEMENT,
-  usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-})
-
-const colorBuffer = device.createBuffer({
-  size: 4 * 4,
-  usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
-})
-device.queue.writeBuffer(colorBuffer, 0, new Float32Array([1, 0, 0, 1]))
-
-const particlesBuffer = device.createBuffer({
-  size: 9 * num * Float32Array.BYTES_PER_ELEMENT,
-  usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-})
-const particlesData = new Float32Array(num*9)
-for(let i=0;i<num;i++){
-  const obj ={
-    position: [0,0,-10],
-    velocity: [random(-100,100),random(-100,100),random(-100,100),0.001],
-    gravity: 10,
-    birthTime: Date.now()
-  }
-  particlesData.set( 
-    Object.values(obj).reduce((acc:any,cur:any)=>{
-      if(cur instanceof Array){
-        return [...acc,...cur]
-      }else {
-        return [...acc,cur]
-      }
-    },[]) as  number[],
-    i*9
-  )
-}
-device.queue.writeBuffer(particlesBuffer,0,particlesData)
-
 const renderGroup = device.createBindGroup({
   layout: renderPipeline.getBindGroupLayout(0),
   entries: [{
     binding: 0,
     resource: {
-      buffer: mvpBuffer
+      buffer: mvpsBuffer
     }
   }, {
     binding: 1,
@@ -117,14 +132,28 @@ const computeGroup = device.createBindGroup({
     resource: {
       buffer: paramsBuffer
     }
-  },
-  {
+  }, {
     binding: 1,
-    resource : {
+    resource: {
       buffer: particlesBuffer
     }
+  }, {
+    binding: 2,
+    resource: {
+      buffer: modelsBuffer
+    },
+  }, {
+    binding: 3,
+    resource: {
+      buffer: mvpsBuffer
+    },
+  }, {
+    binding: 4,
+    resource: {
+      buffer: projectionBuffer
+    }
   }
-]
+  ]
 })
 
 const depthView = device.createTexture({
@@ -132,11 +161,6 @@ const depthView = device.createTexture({
   usage: GPUTextureUsage.RENDER_ATTACHMENT,
   format: 'depth24plus',
 }).createView()
-
-let aspect = size.width / size.height
-let position = { x: 0, y: 0, z: -5 }
-let rotation = { x: 0, y: 0, z: 0 }
-let scale = { x: 1, y: 1, z: 1 }
 
 start()
 function start() {
@@ -146,9 +170,7 @@ function start() {
 }
 
 function frame() {
-  device.queue.writeBuffer(paramsBuffer,0,new Float32Array([Date.now()]))
-  let mvpMatrix = getMvpMatrix(aspect, position, rotation, scale)
-  device.queue.writeBuffer(mvpBuffer, 0, mvpMatrix.buffer)
+  device.queue.writeBuffer(paramsBuffer, 0, new Float32Array([Date.now()]))
   draw()
   requestAnimationFrame(frame)
 }
@@ -159,7 +181,7 @@ function draw() {
     const passEncoder = commandEncoder.beginComputePass()
     passEncoder.setPipeline(computePipeline)
     passEncoder.setBindGroup(0, computeGroup)
-    passEncoder.dispatchWorkgroups(Math.ceil(num*cubeVertexCount/128))
+    passEncoder.dispatchWorkgroups(Math.ceil(num / 1))
     passEncoder.end()
   }
   {
@@ -180,7 +202,7 @@ function draw() {
     passEncoder.setPipeline(renderPipeline)
     passEncoder.setVertexBuffer(0, vertexBuffer)
     passEncoder.setBindGroup(0, renderGroup)
-    passEncoder.draw(cubeVertexCount,num)
+    passEncoder.draw(cubeVertexCount, num)
     passEncoder.end()
   }
   device.queue.submit([commandEncoder.finish()])
@@ -200,8 +222,8 @@ function initMouseControl() {
   }
   function move(e: MouseEvent) {
     rotation.y += e.movementX/100
-    let mvpMatrix = getMvpMatrix(aspect, position, rotation, scale)
-    device.queue.writeBuffer(mvpBuffer, 0, mvpMatrix.buffer)
+    let projectionData = getProjectionMatrix()
+    device.queue.writeBuffer(modelsBuffer, 0, model)
     draw()
   }
   function up(e: MouseEvent) {
@@ -211,14 +233,14 @@ function initMouseControl() {
       window.removeEventListener('mouseup', up)
     }
   }
-  function wheel(e:MouseEvent) {
-    
+  function wheel(e: MouseEvent) {
+
   }
 }
 
 function initGui() {
   let obj = {
-    color: [1, 0, 0]
+    color: [255, 0, 0]
   }
   let gui = new dat.GUI()
   gui.addColor(obj, 'color').onChange(e => {
