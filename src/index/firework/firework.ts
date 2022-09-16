@@ -7,7 +7,9 @@ import { vertWGSL, fragWGSL, computeWGSL } from './wgsl';
 
 const { device, context, format, size, canvas } = await initWebGPU()
 
-const num = 10
+const num = 3_000_00
+const readerBufferSize = 1000 * 4
+let debug = false
 let eyeR = 100
 let aspect = size.width / size.height
 let eyePosition = { x: 0, y: 0, z: eyeR }
@@ -46,11 +48,11 @@ const particlesBuffer = device.createBuffer({
   usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 })
 const logBuffer = device.createBuffer({
-  size: 10000 * Float32Array.BYTES_PER_ELEMENT,
+  size: readerBufferSize,
   usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
 })
 const readerBuffer = device.createBuffer({
-  size: 1000,
+  size: readerBufferSize,
   usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
 })
 
@@ -60,10 +62,9 @@ for (let i = 0; i < num; i++) {
   const position = { x: 0, y: 0, z: 0 }
   const obj = {
     position: Object.values(position),
-    // velocity: [random(-100, 100), random(-100, 100), random(-100, 100), 1],
-    velocity: [1, 2, 3, 4],
-    gravity: 10,
-    birthTime: Date.now()
+    velocity: [random(-100, 100), random(-100, 100), random(-100, 100), 1 / 1000],
+    gravity: 8,
+    birthTime: 9
   }
   particlesData.set(
     Object.values(obj).reduce((acc: any, cur: any) => {
@@ -73,8 +74,9 @@ for (let i = 0; i < num; i++) {
         return [...acc, cur]
       }
     }, []) as number[],
-    i * 9
+    i * (3 + 4 + 1 + 1)
   )
+  debug && particlesData.set([1, 2, 3, 4, 5, 6, 7, 8, 9], i * 9)
   modelsData.set(getModelViewMatrix(position), i * 16)
 }
 const projectionMatrix = getProjectionMatrix(aspect, fov, near, far, eyePosition)
@@ -86,9 +88,6 @@ device.queue.writeBuffer(colorBuffer, 0, new Float32Array([0, 1, 1, 1]))
 device.queue.writeBuffer(particlesBuffer, 0, particlesData)
 
 
-
-let count = 0
-
 function start() {
   initGui()
   initMouseControl()
@@ -99,7 +98,7 @@ function start() {
 function frame() {
   device.queue.writeBuffer(paramsBuffer, 0, new Float32Array([Date.now()]))
   draw()
-  // requestAnimationFrame(frame)
+  !debug && requestAnimationFrame(frame)
 }
 
 async function draw() {
@@ -108,7 +107,7 @@ async function draw() {
     const passEncoder = commandEncoder.beginComputePass()
     passEncoder.setPipeline(computePipeline)
     passEncoder.setBindGroup(0, computeGroup)
-    passEncoder.dispatchWorkgroups(Math.ceil(num / 1)) //组数
+    passEncoder.dispatchWorkgroups(Math.ceil(num / 128)) //组数
     passEncoder.end()
   }
   {
@@ -132,12 +131,13 @@ async function draw() {
     passEncoder.draw(cubeVertexCount, num)
     passEncoder.end()
   }
-  commandEncoder.copyBufferToBuffer(logBuffer, 0, readerBuffer, 0, 1000)
+  debug && commandEncoder.copyBufferToBuffer(logBuffer, 0, readerBuffer, 0, readerBufferSize)
   device.queue.submit([commandEncoder.finish()])
-  await readerBuffer.mapAsync(GPUMapMode.READ)
-  let result = new Float32Array(readerBuffer.getMappedRange())
-  console.log(result);
-  count++
+  if (debug) {
+    await readerBuffer.mapAsync(GPUMapMode.READ)
+    let result = new Float32Array(readerBuffer.getMappedRange())
+    console.log(result);
+  }
 }
 
 function initMouseControl() {
@@ -190,7 +190,7 @@ function initGui() {
   })
 }
 
-const renderPipeline = device.createRenderPipeline({
+const renderPipeline = await device.createRenderPipelineAsync({
   layout: 'auto',
   vertex: {
     module: device.createShaderModule({ code: vertWGSL }),
@@ -254,7 +254,7 @@ const computeGroup = device.createBindGroup({
   }, {
     binding: 1,
     resource: {
-      buffer: particlesBuffer
+      buffer: particlesBuffer,
     }
   }, {
     binding: 2,

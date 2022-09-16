@@ -47,7 +47,7 @@ export function getProjectionMatrix(
   aspect: number = 1.5,
   fov: number = 60 / 180 * Math.PI,
   near: number = 0.1,
-  far: number = 1000,
+  far: number = 100_000,
   position = { x: 0, y: 0, z: 10 }
 ) {
   const center = vec3.fromValues(0, 0, 0)
