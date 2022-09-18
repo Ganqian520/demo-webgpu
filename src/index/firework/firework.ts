@@ -7,15 +7,14 @@ import { vertWGSL, fragWGSL, computeWGSL } from './wgsl';
 
 const { device, context, format, size, canvas } = await initWebGPU()
 
-const num = 3_000_00
-const readerBufferSize = 1000 * 4
-let debug = false
-let eyeR = 100
+const num = 300
+const readerBufferSize = 100 * 4
+let eyeR = 1000
 let aspect = size.width / size.height
 let eyePosition = { x: 0, y: 0, z: eyeR }
 let angle = 0
 let fov = 0.33 * Math.PI
-let far = 1000000
+let far = 1000_000_000_000
 let near = 0.1
 
 
@@ -56,15 +55,18 @@ const readerBuffer = device.createBuffer({
   usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
 })
 
+let debug = !true
 const particlesData = new Float32Array(num * 9)
 const modelsData = new Float32Array(num * 4 * 4)
+const now = Date.now()%1000000
+
 for (let i = 0; i < num; i++) {
   const position = { x: 0, y: 0, z: 0 }
   const obj = {
     position: Object.values(position),
-    velocity: [random(-100, 100), random(-100, 100), random(-100, 100), 1 / 1000],
-    gravity: 8,
-    birthTime: 9
+    velocity: [random(-100, 100), random(-100, 100), random(-100, 100), 50],
+    gravity: 3,
+    birthTime: now,
   }
   particlesData.set(
     Object.values(obj).reduce((acc: any, cur: any) => {
@@ -76,7 +78,6 @@ for (let i = 0; i < num; i++) {
     }, []) as number[],
     i * (3 + 4 + 1 + 1)
   )
-  debug && particlesData.set([1, 2, 3, 4, 5, 6, 7, 8, 9], i * 9)
   modelsData.set(getModelViewMatrix(position), i * 16)
 }
 const projectionMatrix = getProjectionMatrix(aspect, fov, near, far, eyePosition)
@@ -95,10 +96,17 @@ function start() {
 
 }
 
-function frame() {
-  device.queue.writeBuffer(paramsBuffer, 0, new Float32Array([Date.now()]))
+async function frame() {
+  device.queue.writeBuffer(paramsBuffer, 0, new Float32Array([Date.now()%1000000]))
   draw()
-  !debug && requestAnimationFrame(frame)
+  if(debug){
+    await new Promise(r=>{
+      setTimeout(() => {
+        r('')
+      }, 3000);
+    })
+  }
+  requestAnimationFrame(frame)
 }
 
 async function draw() {
@@ -136,7 +144,8 @@ async function draw() {
   if (debug) {
     await readerBuffer.mapAsync(GPUMapMode.READ)
     let result = new Float32Array(readerBuffer.getMappedRange())
-    console.log(result);
+    // console.log(result.slice(0,18));
+    readerBuffer.unmap()
   }
 }
 
@@ -279,7 +288,6 @@ const computeGroup = device.createBindGroup({
   }
   ]
 })
-
 const depthView = device.createTexture({
   size,
   usage: GPUTextureUsage.RENDER_ATTACHMENT,
