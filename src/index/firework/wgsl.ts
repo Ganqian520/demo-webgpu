@@ -1,4 +1,25 @@
 
+export const WGSL = /* wgsl */`
+  @group(0) @binding(0) var<uniform> projection: mat4x4<f32>;
+  @group(0) @binding(1) var<uniform> color : vec4<f32>;
+  @group(0) @binding(2) var<storage,read> modelView : array<mat4x4<f32>>;
+
+
+  @vertex
+  fn v_main(
+    @builtin(instance_index) instanceIndex : u32,
+    @location(0) position : vec3<f32>
+  ) -> @builtin(position) vec4<f32> {
+    return projection * modelView[instanceIndex] * vec4<f32>(position, 1.0);
+  }
+
+  @fragment
+  fn f_main() -> @location(0) vec4<f32> {
+    return color;
+  }
+
+`
+
 export const vertWGSL = /* wgsl */`
   @group(0) @binding(0) var<storage,read> mvps : array<mat4x4<f32>>;
   @vertex
@@ -38,6 +59,7 @@ export const computeWGSL = /* wgsl */`
     velW: f32,
     gravity: f32,
     birthTime: f32, //ms
+    life: f32, //ms
   }
   struct Params {
     currentTime: f32,
@@ -74,8 +96,8 @@ export const computeWGSL = /* wgsl */`
     point.posZ = unitMove*point.velZ*t;
 
     if(debug && index<3){
-      logs[index*u32(9)+0] = t;
-      logs[index*u32(9)+1] = currentTime;
+      logs[index*u32(9)+0] = point.posX;
+      logs[index*u32(9)+1] = birthTime;
     }
     points[index] = point;
     models[index][3] = vec4<f32>(point.posX,point.posY,point.posZ,1);

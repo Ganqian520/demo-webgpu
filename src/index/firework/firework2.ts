@@ -5,14 +5,22 @@ import { cubeData, cubeVertexCount } from "./mesh";
 import { random, getProjectionMatrix, getModelViewMatrix } from "@/common/math";
 import { vertWGSL, fragWGSL, computeWGSL, WGSL } from './wgsl';
 import { Boom, FireWork } from './class';
-import { Player } from './Player';
 
 
 const { device, context, format, size, canvas } = await initWebGPU()
 
-const player = new Player(device,canvas,size.width/size.height)
-
 let fireWork = new FireWork(device)
+
+
+let eyeR = 700
+let aspect = size.width / size.height
+let eyePosition = { x: 0, y: 0, z: eyeR }
+let angleX = 0
+let angleY = 0
+let fov = 0.33 * Math.PI
+let far = Infinity
+let near = 0.1
+let upY = 1
 
 let logBufferSize = 1000
 
@@ -21,7 +29,10 @@ const vertexBuffer = device.createBuffer({
     size: cubeData.byteLength,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
 })
-
+const projectionBuffer = device.createBuffer({
+    size: 4 * 4 * Float32Array.BYTES_PER_ELEMENT,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+})
 
 const paramsBuffer = device.createBuffer({
     size: 1 * Float32Array.BYTES_PER_ELEMENT,
@@ -43,22 +54,23 @@ const readerBuffer = device.createBuffer({
 
 let debug = !true
 
-const projectionMatrix = player.projectionMat4.elements
+const projectionMatrix = getProjectionMatrix(aspect, fov, near, far, eyePosition)
 
 device.queue.writeBuffer(vertexBuffer, 0, cubeData)
+device.queue.writeBuffer(projectionBuffer, 0, projectionMatrix)
 device.queue.writeBuffer(colorBuffer, 0, new Float32Array([0, 1, 1, 1]))
 
 
 
 function start() {
     initGui()
+    initMouseControl()
     frame()
 
 }
 
 async function frame() {
     fireWork.frame()
-    player.frame()
     draw()
     if (debug) {
         await new Promise(r => {
@@ -103,6 +115,56 @@ async function draw() {
     }
 }
 
+function initMouseControl() {
+    const mouseLeft = 0
+    let isDown = false
+    let isClick = true
+    canvas.addEventListener('mousedown', down)
+    canvas.addEventListener('wheel', wheel)
+
+    function down(e: MouseEvent) {
+        if (e.button === mouseLeft) {
+            isDown = true
+            window.addEventListener('mousemove', move)
+            window.addEventListener('mouseup', up)
+        }
+    }
+    function move(e: MouseEvent) {
+        isClick = false
+        angleX += e.movementX / 300 
+        // angleY += e.movementY / 300
+        if (angleY >= 0.5 * Math.PI) angleY = 0.5 * Math.PI
+        if (angleY <= -0.5 * Math.PI) angleY = -0.5 * Math.PI
+        eyePosition.y = eyeR * Math.sin(angleY)
+        let temp = eyeR * Math.cos(angleY)
+        eyePosition.x = -temp * Math.sin(angleX)
+        eyePosition.z = temp * Math.cos(angleX)
+        console.log(eyePosition);
+        let projectionData = getProjectionMatrix(aspect, 0.33 * Math.PI, 0.1, 100000, eyePosition, upY)
+        device.queue.writeBuffer(projectionBuffer, 0, projectionData)
+        draw()
+    }
+    function up(e: MouseEvent) {
+        if (e.button === mouseLeft) {
+            //   isClick && Boom.add({x:random(-100,100),y:0,z:random(-100,100)})
+            isDown = false
+            isClick = true
+            window.removeEventListener('mousemove', move)
+            window.removeEventListener('mouseup', up)
+        }
+    }
+    function wheel(e: WheelEvent) {
+        eyeR += e.deltaY / 10
+        if (eyeR < near) eyeR = near
+        eyePosition.y = -eyeR * Math.sin(angleY)
+        let temp = eyeR * Math.cos(angleY)
+        eyePosition.x = temp * Math.sin(angleX)
+        eyePosition.z = temp * Math.cos(angleX)
+        let projectionData = getProjectionMatrix(aspect, 0.33 * Math.PI, 0.1, 1000, eyePosition)
+        device.queue.writeBuffer(projectionBuffer, 0, projectionData)
+        draw()
+    }
+}
 
 function initGui() {
     let obj = {
@@ -186,7 +248,7 @@ function createRenderGroup(buffer: GPUBuffer) {
             {
                 binding: 0,
                 resource: {
-                    buffer: player.projectionBuffer
+                    buffer: projectionBuffer
                 }
             },
             {

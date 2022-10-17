@@ -1,7 +1,22 @@
-import { mat4, vec3,vec4 } from 'gl-matrix'
+import { mat4, quat, vec3, vec4 } from 'gl-matrix'
 
-export function random(min:number,max:number) {
-  return Math.floor(Math.random()*(max-min) + min)
+
+export function getPositionByGravity(positionInit: number[], time: number, vel: number[], speed: number, gravity = 10/1000_000) {
+  gravity = 0
+  let position = []
+  let unit = Math.sqrt(speed ** 2 / (vel[0] ** 2 + vel[1] ** 2 + vel[2] ** 2))
+  position[0] = unit * vel[0] * time
+  position[1] = unit * vel[1] * time - 0.5 * gravity * time ** 2
+  position[2] = unit * vel[2] * time
+  return position
+}
+
+export function random(min = 0, max = 1, isInt = true) {
+  return isInt ? Math.floor(Math.random() * (max - min) + min) : Math.random() * (max - min) + min
+}
+
+export function getNow() {
+  return Date.now() % 1000000
 }
 
 // return mvp matrix from given aspect, position, rotation, scale
@@ -48,15 +63,17 @@ export function getProjectionMatrix(
   fov: number = 60 / 180 * Math.PI,
   near: number = 0.1,
   far: number = 100_000,
-  position = { x: 0, y: 0, z: 10 }
+  position = { x: 0, y: 0, z: 10 },
+  upY: number = 1
 ) {
   const center = vec3.fromValues(0, 0, 0)
-  const up = vec3.fromValues(0, 1, 0)
+  const up = vec3.fromValues(0, upY, 0)
   // create cameraview
   const cameraView = mat4.create()
   const eye = vec3.fromValues(position.x, position.y, position.z)
   mat4.translate(cameraView, cameraView, eye)
   mat4.lookAt(cameraView, eye, center, up)
+  // mat4.targetTo(cameraView, eye, vec3.fromValues(0, 0, 1), up) 
   // get a perspective Matrix
   const projectionMatrix = mat4.create()
   mat4.perspective(projectionMatrix, fov, aspect, near, far)

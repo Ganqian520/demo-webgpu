@@ -9,6 +9,7 @@
     * {
       font-size: 14px;
     }
+
     body {
       display: flex;
       margin: 0;
@@ -26,6 +27,7 @@
       top: 0;
       transition: all 0.3s linear;
     }
+
     .menu-hidden {
       transform: translateX(-200px);
     }
@@ -36,7 +38,7 @@
       right: -20px;
       width: 20px;
       height: 20px;
-      background-color: rgba(255,255,255,.3);
+      background-color: rgba(255, 255, 255, .3);
       line-height: 20px;
       text-align: center;
       color: white;
@@ -67,22 +69,28 @@
   </div>
   <iframe id=iframe></iframe>
   <script>
-    const config = [{
-      en: 'basicTriangle',
-      cn: '基础三角形',
-    }, {
-      en: 'updateTriangle',
-      cn: '更新三角形',
-    },{
-      en: 'rotatingCube',
-      cn: '旋转正方体',
-    },{
-      en: 'computeBoids',
-      cn: '计算管线',
-    },{
-      en: 'firework',
-      cn: '烟花'
-    }]
+    const initKey = 'firework'
+    const config = [
+      {
+        en: 'test',
+        cn: '测试'
+      },
+      {
+        en: 'basicTriangle',
+        cn: '基础三角形',
+      }, {
+        en: 'updateTriangle',
+        cn: '更新三角形',
+      }, {
+        en: 'rotatingCube',
+        cn: '旋转正方体',
+      }, {
+        en: 'computeBoids',
+        cn: '计算管线',
+      }, {
+        en: 'firework',
+        cn: '烟花'
+      }]
     for (let item of config) {
       const { en: key, cn } = item
       let a = document.createElement('a')
@@ -94,16 +102,12 @@
         window.location.hash = key
       }
       menu.appendChild(a)
-      key == 'firework' && a.click()
+      key == initKey && a.click()
     }
-    
+
     let isShowMenu = false
-    toggle.onclick = ()=> {
-      if(isShowMenu){
-        menu.className = 'menu-hidden'
-      }else{
-        menu.className = ''
-      }
+    toggle.onclick = () => {
+      menu.className = isShowMenu ? '' : 'menu-hidden'
       isShowMenu = !isShowMenu
     }
   </script>

@@ -1,10 +1,15 @@
+
+
+变化矩阵的推导 https://www.bilibili.com/video/BV1RJ411w7u6?p=2&vd_source=2b28268a3a96298c3c365ae92fa29dd7
+
 画多个烟花buffer该如何定义
 
 开根号快还是三角函数快
 
 时间戳隔一段时间才写入有效/初始写入的不一致 => 数据精度问题，时间戳都14位数了
 
-
+[Invalid CommandBuffer] =>
+    
     
 
 哪些是开始时算一次 每帧算一次 每个顶点算一次
