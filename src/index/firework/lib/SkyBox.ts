@@ -11,10 +11,8 @@ export class SkyBox extends ObjectGPU {
         size ??= 10000
         super({
             paramsTransf: { scale: { x: size, y: size, z: size } },
+            paramsGPU: {isReady:false,cullmode: 'front'}
         })
-        setTimeout(() => {
-            // this.init()
-        }, 3000);
 
         initCubemapTextureAsync().then((texture: GPUTexture) => {
             let sampler = Renderer.device.createSampler({
@@ -22,7 +20,6 @@ export class SkyBox extends ObjectGPU {
                 minFilter: 'linear'
             })
             this.bindingBuffers = [sampler, texture.createView({ dimension: 'cube', })]
-            // this.bindingBuffers = [sampler, texture.createView()]
             this.wgsl = {
                 value: /* wgsl */`
                         @group(0) @binding(0) var<uniform> vpMat: mat4x4<f32>;
@@ -55,14 +52,13 @@ export class SkyBox extends ObjectGPU {
                         ) -> @location(0) vec4<f32> {
                             var cubemapVec = fragPosition.xyz - vec3<f32>(0.5, 0.5, 0.5);
                             return textureSample(myTexture, mySampler, cubemapVec);
-                            // return fragPosition;
                         }
                     `,
             }
+            this.isReady = true
             this.init()
         })
         async function initCubemapTextureAsync() {
-            // let promises = imgs.map((src: string) => fetch(src).then(res => res.blob()).then(res => window.createImageBitmap(res)))
             let promises = imgs.map((src: string) => {
                 let img = document.createElement('img');
                 img.src = src;
@@ -72,19 +68,12 @@ export class SkyBox extends ObjectGPU {
             let cubemapTexture = Renderer.device.createTexture({
                 dimension: '2d',
                 size: [imageBitmaps[0].width, imageBitmaps[0].height, 6],
-                // size: [imageBitmaps[0].width, imageBitmaps[0].height],
                 format: 'rgba8unorm',
                 usage:
                     GPUTextureUsage.TEXTURE_BINDING |
                     GPUTextureUsage.COPY_DST |
                     GPUTextureUsage.RENDER_ATTACHMENT,
             });
-
-            // Renderer.device.queue.copyExternalImageToTexture(
-            //     { source: imageBitmaps[0] },
-            //     { texture: cubemapTexture },
-            //     [imageBitmaps[0].width, imageBitmaps[0].height]
-            // );
 
             for (let i = 0; i < imageBitmaps.length; i++) {
                 const imageBitmap = imageBitmaps[i];

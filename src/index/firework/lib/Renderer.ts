@@ -80,8 +80,9 @@ export class Renderer {
             }
         }
         const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor)
-        // passEncoder.setBindGroup(0,)
-        scene.objects.forEach(v => v.frame(passEncoder))
+        
+        scene.objects.forEach(v => v.frameObjecGPU(passEncoder))
+    
         passEncoder.end()
         this.device.queue.submit([commandEncoder.finish()])
     }

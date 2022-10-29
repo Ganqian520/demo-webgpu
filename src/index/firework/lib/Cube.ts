@@ -9,9 +9,9 @@ export class Cube extends  ObjectGPU{
         scale?: { x: number, y: number, z: number }
     }) {
         super({
-            paramsTransf: params
-        })
-        console.log('m',this.worldMatrix.elements);
+            paramsTransf: params,
+        },)
+        
     }
     
 }

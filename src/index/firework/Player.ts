@@ -1,4 +1,4 @@
-import { Vec3, Mat4 } from "./common/math"
+import { Vec3, Mat4 } from "./lib/math"
 
 enum Mouse {
     mouseLeft = 0

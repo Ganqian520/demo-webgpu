@@ -1,5 +1,6 @@
 export const cubeModel = {
     vertexCount: 36,
+    arrayStride: [3,2],
     data: [
         // float3 position, float2 uv
         // face1
@@ -44,5 +45,5 @@ export const cubeModel = {
         +1, +1, -1,    1, 0,
         +1, -1, -1,    1, 1,
         -1, +1, -1,    0, 0
-    ].map(v => v / 1)
+    ].map(v => v / 2)
 }

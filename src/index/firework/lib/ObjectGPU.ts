@@ -1,25 +1,35 @@
 import { Object3D } from "./Object3D";
 import { Renderer } from "./Renderer";
 import { cubeModel } from "./model";
-import { Vec3 } from "./math";
+import { Mat4, Vec3 } from "./math";
+import { Camera } from "./Camera";
 
 export class ObjectGPU extends Object3D {
 
     isInstance: boolean
-    instanceCount: number
+    instanceNum: number
+
+    isReady: boolean
+
+    isObjectGPU: true
 
     model: {
         data: number[],
         vertexCount: number,
+        arrayStride: number[],
     }
 
     vertexBuffer: GPUBuffer
 
-    instanceModelsMatBuffer: GPUBuffer
+    modelsMatBuffer: GPUBuffer
 
     modelMatBuffer: GPUBuffer
 
     renderPL: GPURenderPipeline
+
+    topology: GPUPrimitiveTopology
+
+    cullmode: GPUCullMode
 
     wgsl: {
         value: string,
@@ -31,16 +41,27 @@ export class ObjectGPU extends Object3D {
 
     bindingBuffers: Array<GPUBuffer | GPUSampler | GPUTextureView>
 
+    modelMatsData: number[]
+
+    onRenderCb: Function
+
     constructor(params?: {
         paramsGPU?: {
-            instanceCount?: number
-            modelData?: Float32Array
+            instanceNum?: number
+            model?: {
+                data: number[],
+                vertexCount: number,
+                arrayStride: number[],
+            }
             wgsl?: {
                 value: string,
                 vertEntry?: string,
                 fragEntry?: string,
             },
-            bindingBuffers?: GPUBuffer[]
+            topology?: GPUPrimitiveTopology,
+            cullmode?: GPUCullMode,
+            bindingBuffers?: GPUBuffer[],
+            isReady?: boolean,
         },
         paramsTransf?: {
             position?: { x: number, y: number, z: number }
@@ -50,16 +71,29 @@ export class ObjectGPU extends Object3D {
     }) {
         const { paramsTransf, paramsGPU } = params
         super(paramsTransf)
-        const { instanceCount, modelData, wgsl, bindingBuffers } = paramsGPU || {}
-        this.bindingBuffers = bindingBuffers
-        this.wgsl = wgsl
-        this.instanceCount = instanceCount
-        this.isInstance = typeof instanceCount === "number"
-        this.model = cubeModel
-        this.init()
-        this.addEventListener('updateWorldMatrix', () => {
-            this.isInstance || Renderer.device.queue.writeBuffer(this.modelMatBuffer, 0, new Float32Array(this.worldMatrix.elements))
-        })
+        let { instanceNum, model, wgsl, bindingBuffers, topology,cullmode ,isReady} = paramsGPU || {}
+        this.bindingBuffers = bindingBuffers ?? []
+        this.wgsl = wgsl 
+        this.topology = topology ?? 'triangle-list'
+        this.cullmode = cullmode ?? 'back'
+        this.instanceNum = instanceNum ?? 1
+        this.isInstance = this.instanceNum !== 1
+        if(this.isInstance) this.modelMatsData = []
+        this.model = model ?? cubeModel
+        this.isReady = isReady ?? true
+        this.isReady && this.init()
+        
+        if(!this.isInstance){
+            this.addEventListener('updateWorldMatrix', () => {
+                this.worldMatrix.log('写入M矩阵buffer')
+                Renderer.device.queue.writeBuffer(this.modelMatBuffer, 0, new Float32Array(this.worldMatrix.elements))
+            })
+        }else{
+            this.addEventListener('updateInstanceMatrix', () => {
+                Renderer.device.queue.writeBuffer(this.modelsMatBuffer, 0, new Float32Array(this.modelMatsData))
+            })
+        }
+        this.isReady && this.initWorldMatrix()
     }
 
     init() {
@@ -67,35 +101,46 @@ export class ObjectGPU extends Object3D {
         this.initBuffer()
         this.initRenderPipeLine()
         this.initBindGroup()
-        this.updateWorldMatrix()
+        this.initWorldMatrix()
     }
 
-    frame(passEncoder: GPURenderPassEncoder) {
+    frameObjecGPU(passEncoder: GPURenderPassEncoder) {
+        if(!this.isReady) return
+        if(this.cullmode==='back') {
+            this.worldMatrix.log()
+            // new Vec3(1,1,1).applyMatrix(this.worldMatrix).applyMatrix(Camera.vpMat)
+        }
+        this.onRenderCb && this.onRenderCb()
         passEncoder.setPipeline(this.renderPL)
         passEncoder.setVertexBuffer(0, this.vertexBuffer)
         passEncoder.setBindGroup(0, this.bindGroup)
-        passEncoder.draw(this.model.vertexCount, this.instanceCount || 1)
+        passEncoder.draw(this.model.vertexCount, this.instanceNum || 1)
     }
 
     private initRenderPipeLine(params?: {
 
     }) {
+        let arrayStride = this.model.arrayStride.reduce((p,c)=>p+c) * Float32Array.BYTES_PER_ELEMENT
+
+        let lastOffset = 0
+        let attributes = this.model.arrayStride.map((v, i) => {
+            let obj = {
+                shaderLocation: i,
+                offset: lastOffset,
+                format: 'float32x' + v,
+            }
+            lastOffset += v*Float32Array.BYTES_PER_ELEMENT
+            return obj as GPUVertexAttribute
+        })
+
         this.renderPL = Renderer.device.createRenderPipeline({
             layout: 'auto',
             vertex: {
                 module: Renderer.device.createShaderModule({ code: this.wgsl.value }),
                 entryPoint: this.wgsl.vertEntry,
                 buffers: [{
-                    arrayStride: (3 + 2) * Float32Array.BYTES_PER_ELEMENT,
-                    attributes: [{
-                        shaderLocation: 0,
-                        offset: 0,
-                        format: 'float32x3'
-                    }, {
-                        shaderLocation: 1,
-                        offset: 3 * Float32Array.BYTES_PER_ELEMENT,
-                        format: 'float32x2'
-                    }]
+                    arrayStride,
+                    attributes,
                 }]
             },
             fragment: {
@@ -104,8 +149,8 @@ export class ObjectGPU extends Object3D {
                 targets: [{ format: Renderer.format }]
             },
             primitive: {
-                topology: 'triangle-list',
-                cullMode: 'back',
+                topology: this.topology,
+                cullMode: this.cullmode,
                 frontFace: 'ccw'
             },
             depthStencil: {
@@ -134,11 +179,20 @@ export class ObjectGPU extends Object3D {
                 @vertex
                 fn v_main(
                     @builtin(instance_index) instanceIndex : u32,
+                    @builtin(vertex_index) a: u32,
                     @location(0) position : vec4<f32>,
                     @location(1) uv: vec2<f32>
                 ) -> Output {
                     var output: Output;
                     output.Position = vpMat * ${this.isInstance ? 'modelMats[instanceIndex]' : 'modelMat'} * position;
+                    // output.Position = vec4<f32>(0,0,0,1);
+                    // if(a == 0) {
+                    //     output.Position = vec4<f32>(0,0,0,1);
+                    // }else if(a ==2) {
+                    //     output.Position = vec4<f32>(1,1,0,1);
+                    // }else {
+                    //     output.Position = vec4<f32>(1,-1,0,1);
+                    // }
                     output.fragUV = uv;
                     output.fragPosition = 0.5 * (position + vec4<f32>(1.0, 1.0, 1.0, 1.0));
                     return output;
@@ -149,7 +203,8 @@ export class ObjectGPU extends Object3D {
                     @location(0) fragUV: vec2<f32>,
                     @location(1) fragPosition: vec4<f32>
                 ) -> @location(0) vec4<f32> {
-                    return vec4<f32>(0,0,1,1);
+                    return fragPosition;
+                    // return vec4<f32>(1,1,1,1);
                 }
             `
         }
@@ -167,7 +222,7 @@ export class ObjectGPU extends Object3D {
         } as GPUBindGroupEntry, {
             binding: 1,
             resource: {
-                buffer: this.isInstance ? this.instanceModelsMatBuffer : this.modelMatBuffer,
+                buffer: this.isInstance ? this.modelsMatBuffer : this.modelMatBuffer,
             }
         } as GPUBindGroupEntry]
         this.bindingBuffers?.forEach((buffer, i) => {
@@ -194,8 +249,8 @@ export class ObjectGPU extends Object3D {
         })
         Renderer.device.queue.writeBuffer(this.vertexBuffer, 0, new Float32Array(this.model.data))
         if (this.isInstance) {
-            this.instanceModelsMatBuffer = Renderer.device.createBuffer({
-                size: this.instanceCount * 16 * Float32Array.BYTES_PER_ELEMENT,
+            this.modelsMatBuffer = Renderer.device.createBuffer({
+                size: this.instanceNum * 16 * Float32Array.BYTES_PER_ELEMENT,
                 usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
             })
         } else {
