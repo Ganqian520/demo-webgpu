@@ -41,7 +41,8 @@ export class SkyBox extends ObjectGPU {
                             var output: VertexOutput;
                             output.Position = vpMat * modelMat * position;
                             output.fragUV = uv;
-                            output.fragPosition = 0.5 * (position + vec4<f32>(1.0, 1.0, 1.0, 1.0));
+                            // output.fragPosition = 0.5 * (position + vec4<f32>(1.0, 1.0, 1.0, 1.0));
+                            output.fragPosition = position;
                             return output;
                         }
 
@@ -51,7 +52,8 @@ export class SkyBox extends ObjectGPU {
                             @location(1) fragPosition: vec4<f32>
                         ) -> @location(0) vec4<f32> {
                             var cubemapVec = fragPosition.xyz - vec3<f32>(0.5, 0.5, 0.5);
-                            return textureSample(myTexture, mySampler, cubemapVec);
+                            // return textureSample(myTexture, mySampler, cubemapVec);
+                            return textureSample(myTexture, mySampler, fragPosition.xyz);
                         }
                     `,
             }

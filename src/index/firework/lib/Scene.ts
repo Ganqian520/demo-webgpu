@@ -7,7 +7,6 @@ export class Scene extends Object3D {
 
 
     control: Control
-    objects: ObjectGPU[] = []
 
     constructor(params?:{
 
@@ -21,12 +20,4 @@ export class Scene extends Object3D {
         this.control.init()
     }
 
-    add(obj:ObjectGPU){
-        this.objects.push(obj)
-    }
-
-    render() {
-        this.control?.update()
-
-    }
 }

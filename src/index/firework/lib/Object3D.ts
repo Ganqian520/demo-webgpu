@@ -1,20 +1,21 @@
 import { Mat4, Vec3 } from "./math";
 import { EventDispatcher } from "./EventDispatcher";
+import { ObjectGPU } from "./ObjectGPU";
 
-const tm = new Mat4()
-const tv = new Vec3()
 
 export class Object3D extends EventDispatcher {
 
-    position: Vec3
+    position: Vec3 = new Vec3(0,0,0)
 
-    rotation: Vec3
+    rotation: Vec3 = new Vec3(0,0,0)
 
-    scale: Vec3
+    scale: Vec3 =  new Vec3(1,1,1)
 
-    matrix: Mat4
+    localMatrix: Mat4 = new Mat4()
 
-    worldMatrix: Mat4 //物体m矩阵
+    worldMatrix: Mat4 = new Mat4()
+
+    isBufferNeedChange = false
 
     parent: Object3D
 
@@ -26,27 +27,33 @@ export class Object3D extends EventDispatcher {
         scale?: { x: number, y: number, z: number }
     }) {
         super()
+        this.setFromTRS(params)
+        
+    }
+
+    setFromTRS(params?: {
+        position?: { x: number, y: number, z: number }
+        rotation?: { x: number, y: number, z: number }
+        scale?: { x: number, y: number, z: number }
+    }) {
         const { position, rotation, scale } = params || {}
-        this.position = position ? new Vec3(position.x, position.y, position.z) : new Vec3(0, 0, 0)
-        this.rotation = rotation ? new Vec3(rotation.x, rotation.y, rotation.z) : new Vec3(0, 0, 0)
-        this.scale = scale ? new Vec3(scale.x, scale.y, scale.z) : new Vec3(1, 1, 1)
-        this.initWorldMatrix()
-
+        if (position) this.position = new Vec3(position.x, position.y, position.z)
+        if (rotation) this.rotation = new Vec3(rotation.x, rotation.y, rotation.z)
+        if (scale) this.scale = new Vec3(scale.x, scale.y, scale.z)
+        this.localMatrix = Mat4.multiplyMatrices(
+            Mat4.makeTranslation(this.position),
+            Mat4.makeRotationX(this.rotation.x),
+            Mat4.makeRotationY(this.rotation.y),
+            Mat4.makeRotationZ(this.rotation.z),
+            Mat4.makeScale(this.scale),
+        )
+        this.updateWorldMatrix()
+        
     }
 
-    initWorldMatrix() {       
-        this.worldMatrix = new Mat4()
-        this.worldMatrix.multiply(tm.makeTranslation(this.position))
-        this.worldMatrix.multiply(tm.makeRotationX(this.rotation.x))
-        this.worldMatrix.multiply(tm.makeRotationY(this.rotation.y))
-        this.worldMatrix.multiply(tm.makeRotationZ(this.rotation.z))
-        this.worldMatrix.multiply(tm.makeScale(this.scale))
-        this.dispatchEvent('updateWorldMatrix')
-    }
-
-    translateSelf(x: number, y: number, z: number) {
-        this.worldMatrix.multiply(tm.makeTranslation(x, y, z))
-        this.dispatchEvent('updateWorldMatrix')
+    translate(x: number, y: number, z: number) {
+        this.localMatrix.multiply(Mat4.makeTranslation(x, y, z))
+        this.updateWorldMatrix()
     }
 
     setPosition(x: number, y: number, z: number) {
@@ -55,26 +62,39 @@ export class Object3D extends EventDispatcher {
 
     rotateX(angle: number) {
 
-        this.worldMatrix.multiply(tm.makeRotationX(angle))
-        this.dispatchEvent('updateWorldMatrix')
+        this.localMatrix.multiply(Mat4.makeRotationX(angle))
+        this.updateWorldMatrix()
     }
 
     rotateY(angle: number) {
 
         // this.rotation.y += angle
-        this.worldMatrix.multiply(tm.makeRotationY(angle))
-        this.dispatchEvent('updateWorldMatrix')
+        this.localMatrix.multiply(Mat4.makeRotationY(angle))
+        this.updateWorldMatrix()
     }
 
     rotateZ(angle: number) {
 
-        this.worldMatrix.multiply(tm.makeRotationZ(angle))
-        this.dispatchEvent('updateWorldMatrix')
+        this.localMatrix.multiply(Mat4.makeRotationZ(angle))
+        this.updateWorldMatrix()
 
     }
 
     add(obj:Object3D) {
+        obj.parent = this
         this.children.push(obj)
+    }
+
+    updateWorldMatrix() {
+        if(this.parent) {
+            this.worldMatrix = Mat4.multiplyMatrices(this.parent.worldMatrix,this.localMatrix)
+        }else{
+            this.worldMatrix = this.localMatrix
+        }
+        this.children.length && this.children.forEach((obj: Object3D) => {
+            obj.updateWorldMatrix()
+        })
+        this.isBufferNeedChange = true
     }
 
 }

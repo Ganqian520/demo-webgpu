@@ -11,8 +11,6 @@ export class ObjectGPU extends Object3D {
 
     isReady: boolean
 
-    isObjectGPU: true
-
     model: {
         data: number[],
         vertexCount: number,
@@ -84,16 +82,14 @@ export class ObjectGPU extends Object3D {
         this.isReady && this.init()
         
         if(!this.isInstance){
-            this.addEventListener('updateWorldMatrix', () => {
-                this.worldMatrix.log('写入M矩阵buffer')
-                Renderer.device.queue.writeBuffer(this.modelMatBuffer, 0, new Float32Array(this.worldMatrix.elements))
-            })
+            // this.addEventListener('updateWorldMatrix', () => {
+            //     Renderer.device.queue.writeBuffer(this.modelMatBuffer, 0, new Float32Array(this.worldMatrix.elements))
+            // })
         }else{
             this.addEventListener('updateInstanceMatrix', () => {
                 Renderer.device.queue.writeBuffer(this.modelsMatBuffer, 0, new Float32Array(this.modelMatsData))
             })
         }
-        this.isReady && this.initWorldMatrix()
     }
 
     init() {
@@ -101,14 +97,13 @@ export class ObjectGPU extends Object3D {
         this.initBuffer()
         this.initRenderPipeLine()
         this.initBindGroup()
-        this.initWorldMatrix()
     }
 
     frameObjecGPU(passEncoder: GPURenderPassEncoder) {
         if(!this.isReady) return
-        if(this.cullmode==='back') {
-            this.worldMatrix.log()
-            // new Vec3(1,1,1).applyMatrix(this.worldMatrix).applyMatrix(Camera.vpMat)
+        if(this.isBufferNeedChange && !this.isInstance){
+            Renderer.device.queue.writeBuffer(this.modelMatBuffer, 0, new Float32Array(this.worldMatrix.elements))
+            this.isBufferNeedChange = false
         }
         this.onRenderCb && this.onRenderCb()
         passEncoder.setPipeline(this.renderPL)
@@ -185,14 +180,7 @@ export class ObjectGPU extends Object3D {
                 ) -> Output {
                     var output: Output;
                     output.Position = vpMat * ${this.isInstance ? 'modelMats[instanceIndex]' : 'modelMat'} * position;
-                    // output.Position = vec4<f32>(0,0,0,1);
-                    // if(a == 0) {
-                    //     output.Position = vec4<f32>(0,0,0,1);
-                    // }else if(a ==2) {
-                    //     output.Position = vec4<f32>(1,1,0,1);
-                    // }else {
-                    //     output.Position = vec4<f32>(1,-1,0,1);
-                    // }
+                    // output.Position.z = - output.Position.z;
                     output.fragUV = uv;
                     output.fragPosition = 0.5 * (position + vec4<f32>(1.0, 1.0, 1.0, 1.0));
                     return output;

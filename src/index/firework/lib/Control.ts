@@ -7,8 +7,6 @@ enum Mouse {
     mouseLeft = 0
 }
 
-const tm = new Mat4()
-
 export abstract class Control {
 
     abstract init():void
@@ -44,8 +42,7 @@ export class Fly1Control extends Control {
 
     private dom: HTMLElement
     private object: Object3D //被控制的物体
-    private eyeMatrix: Mat4 //控制选择的矩阵
-    private bodyMatrix: Mat4 //控制移动的矩阵
+    private body: Object3D = new Object3D()
 
     constructor(object: Object3D, dom: HTMLElement) {
         super()
@@ -59,9 +56,8 @@ export class Fly1Control extends Control {
             up: false,
             down: false,
         }
-        this.eyeMatrix = new Mat4()
-        this.bodyMatrix =  new Mat4()
-        
+        this.body.translate(0,2,20)
+        this.body.add(object)
     }
     init() {
         this.initMove()
@@ -75,11 +71,7 @@ export class Fly1Control extends Control {
         let x = (this.moveStatus.left ? -delta : 0) + (this.moveStatus.right ? delta : 0)
         let y = (this.moveStatus.up ? delta : 0) + (this.moveStatus.down ? -delta : 0)
 
-        this.object.translateSelf(x,y,z)
-        // this.bodyMatrix.multiply(tm.makeTranslation(x, y, z))
-        // this.object.worldMatrix.multiply(this.bodyMatrix)
-        // this.object.worldMatrix = tm.multiplyMatrices(this.bodyMatrix,this.object.worldMatrix)
-        // console.log(this.object.worldMatrix.elements);
+        this.body.translate(x,y,z)
     }
 
     private initMove() {
@@ -115,12 +107,8 @@ export class Fly1Control extends Control {
         function move(e: MouseEvent) {
             let deltX = e.movementX / 1000
             let deltY = e.movementY / 1000
-            that.object.rotateY(-deltX)
+            that.body.rotateY(-deltX)
             that.object.rotateX(-deltY)
-            // that.eyeMatrix.multiply(tm.makeRotationY(-deltX))
-            // that.eyeMatrix.multiply(tm.makeRotationX(-deltY))
-            // that.object.worldMatrix.multiply(that.eyeMatrix)
-            // that.object.worldMatrix = tm.multiplyMatrices(that.eyeMatrix, that.object.worldMatrix)
         }
 
         function up(e: MouseEvent) {
@@ -144,10 +132,10 @@ export class OrbitControl extends Control {
 
     private camera: Camera
 
-    private dom: HTMLElement
+    private center1: Object3D = new Object3D()
+    private center2: Object3D = new Object3D()
 
-    private deltX: number
-    private deltY: number
+    private dom: HTMLElement
 
     private r: number //轨道球半径
 
@@ -156,6 +144,8 @@ export class OrbitControl extends Control {
         this.camera = camera
         this.dom = dom
         this.r = camera.position.distanceTo(0,0,0)
+        this.center2.add(camera)
+        this.center1.add(this.center2)
         this.initRotate()
     }
 
@@ -167,6 +157,7 @@ export class OrbitControl extends Control {
         let that = this
 
         this.dom.addEventListener('mousedown', down)
+        this.dom.addEventListener('wheel',wheel)
 
         function down(e: MouseEvent) {
             if (e.button === Mouse.mouseLeft) {
@@ -178,29 +169,12 @@ export class OrbitControl extends Control {
 
         function move(e: MouseEvent) {
 
-            let { deltX, deltY,camera,r } = that 
+            const deltX = e.movementX / 500
+            const deltY = e.movementY / 500
 
-            deltX = e.movementX / 100000
-            deltY = e.movementY / 100000
-
-            let right = 0.5*Math.PI
-
-            if(deltY>=right) deltY = right
-            if(deltY<=-right) deltY = -right
-
-            camera.position.y = r*Math.sin(deltY)
-
-            let temp = r*Math.cos(deltY)
-
-            camera.position.x = -temp*Math.sin(deltX)
-            camera.position.z = temp*Math.cos(deltX)
-
-            camera.initWorldMatrix()
-            console.log(camera.worldMatrix.elements);
-            camera.worldMatrix.lookAt(camera.position)
-            console.log(camera.worldMatrix.elements);
+            that.center1.rotateY(-deltX)
+            that.center2.rotateX(-deltY)
             
-            that.camera.dispatchEvent('updateWorldMatrix')
         }
 
         function up(e: MouseEvent) {
@@ -208,6 +182,11 @@ export class OrbitControl extends Control {
                 window.removeEventListener('mousemove', move)
                 window.removeEventListener('mouseup', up)
             }
+        }
+
+        function wheel(e:WheelEvent) {
+            const deltaY = e.deltaY / 10
+            that.camera.translate(0,0,deltaY)
         }
     }
 

@@ -1,5 +1,7 @@
 import { Scene } from './Scene'
 import { Camera } from './Camera'
+import { ObjectGPU } from './ObjectGPU'
+import { Object3D } from './Object3D'
 
 export class Renderer {
 
@@ -19,6 +21,7 @@ export class Renderer {
 
     size: { w: number, h: number }
 
+    objectGPUs: ObjectGPU[] = []
 
     constructor(params?: {
 
@@ -81,7 +84,10 @@ export class Renderer {
         }
         const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor)
         
-        scene.objects.forEach(v => v.frameObjecGPU(passEncoder))
+        scene?.control?.update()
+        if(camera.isBufferNeedChange) camera.updateVpMat()
+        this.updateObjectGPU(scene,passEncoder)
+
     
         passEncoder.end()
         this.device.queue.submit([commandEncoder.finish()])
@@ -91,6 +97,14 @@ export class Renderer {
         this.size = { w, h }
         this.canvas.width = w
         this.canvas.height = h
+    }
+
+    updateObjectGPU(scene: Scene,passEncoder:GPURenderPassEncoder){
+        const dfs = (obj:Object3D) => {
+            if(obj instanceof ObjectGPU) obj.frameObjecGPU(passEncoder)
+            obj.children?.forEach(v => dfs(v))
+        }
+        dfs(scene)
     }
 
     // initGlobalBindgroup() {
